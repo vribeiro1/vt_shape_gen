@@ -1,0 +1,7 @@
+funcy
+matplotlib
+numpy==1.21
+shapely
+tgt
+torch
+torchaudio
