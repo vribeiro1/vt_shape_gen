@@ -7,7 +7,8 @@ requirements = [
     "shapely",
     "tgt",
     "torch",
-    "torchaudio"
+    "torchaudio",
+    "ujson"
 ]
 
 setup(

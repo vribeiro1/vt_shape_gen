@@ -8,20 +8,44 @@
 
 <ol>
 
-<li>
-    Clone the repository <br>
-    <code>>> git clone git@gitlab.inria.fr:vsouzari/vt_shape_gen.git</code>
-</li>
+<li>Clone the repository</li>
 
-<li>
-    Create a virtual environment <br>
-    <code>>> cd vt_shape_gen</code><br>
-    <code>>> python3 -m venv .dev_env</code>
-</li>
+```
+>> git clone git@gitlab.inria.fr:vsouzari/vt_shape_gen.git
+```
 
-<li>
-    Install the requirements <br>
-    <code>>> pip3 install -r requirements.txt</code>
-</li>
+<li> Create and activate your virtual environment</li>
+
+```
+>> cd vt_shape_gen
+>> python3 -m venv .dev_env
+>> source .dev_env/bin/activate
+```
+
+<li>Clone vt_tools</li>
+
+```
+>> cd ..
+>> git clone git@gitlab.inria.fr:vsouzari/vt_tools.git
+>> cd vt_shape_gen
+```
+
+<li>Install vt_tools </li>
+
+```
+>> pip3 install -e ../vt_tools
+```
+
+<li>Install the requirements </li>
+
+```
+>> pip3 install -r requirements.txt
+```
+
+<li>Run the tests</li>
+
+```
+>> py.test test
+```
 
 </ol>

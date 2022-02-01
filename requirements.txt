@@ -1,7 +1,15 @@
 funcy
 matplotlib
 numpy==1.21
+pytest
 shapely
 tgt
 torch
 torchaudio
+ujson
+
+# Install directly from the repo
+# git+https://gitlab.inria.fr/vsouzari/vt_tools.git
+
+# Clone the repo 'https://gitlab.inria.fr/vsouzari/vt_tools.git' and install from local
+-e ../vt_tools
