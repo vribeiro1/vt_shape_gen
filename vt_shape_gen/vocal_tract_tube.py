@@ -222,7 +222,7 @@ def shapes_to_articulators_dict(shapes, articulators=None, regularize=False):
     return articulators_dicts
 
 
-def connect_articulators(articulators_dict, eps=0.004, load=True):
+def generate_vocal_tract_tube(articulators_dict, eps=0.004, load=True):
     """
     Connect the articulators to produce a single shape for the entire vocal tract.
 
