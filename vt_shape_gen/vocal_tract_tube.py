@@ -35,13 +35,13 @@ def percent_to_mm(value_percent, resolution = 136, pixel_spacing=1.412):
 
 
 SNAIL_PARAMETERS = {
-    "soft-palate": {
+    SOFT_PALATE: {
         "width_int": mm_to_percent(1.5),
         "width_ext": mm_to_percent(3.5),
         "width_apex_int": mm_to_percent(2.5),
         "width_apex_ext": mm_to_percent(1.)
     },
-    "epiglottis": {
+    EPIGLOTTIS: {
         "width_int": mm_to_percent(2.5),
         "width_ext": mm_to_percent(2.5),
         "width_apex_int": mm_to_percent(1.5),
@@ -58,11 +58,10 @@ def closest_point_between_arrays(arr_1, arr_2):
     arr_1 (np.ndarray): (N,) shaped array
     arr_2 (np.ndarray): (M,) shaped array
     """
-
     dist_mtx = distance_matrix(arr_1, arr_2)
-    nrows, ncols = dist_mtx.shape
+    _, ncols = dist_mtx.shape
 
-    amin_array_1 = dist_mtx.argmin() // nrows
+    amin_array_1 = dist_mtx.argmin() // ncols
     amin_array_2 = dist_mtx.argmin() % ncols
 
     return amin_array_1, amin_array_2
@@ -131,25 +130,25 @@ def load_articulators_arrays(articulators_filepaths, snail_parameters=None):
         snail_parameters = SNAIL_PARAMETERS
 
     # Load soft palate and reconstruct snail
-    fp_soft_palate = articulators_filepaths["soft-palate"]
-    midline_soft_palate = load_articulator_array(fp_soft_palate, norm=False)
-    params_soft_palate = snail_parameters["soft-palate"]
+    fp_soft_palate = articulators_filepaths[SOFT_PALATE]
+    midline_soft_palate = load_articulator_array(fp_soft_palate)
+    params_soft_palate = snail_parameters[SOFT_PALATE]
     snail_soft_palate = reconstruct_snail_from_midline(midline_soft_palate, **params_soft_palate)
 
     # Load epiglottis and reconstruct snail
-    fp_epiglottis = articulators_filepaths["epiglottis"]
-    midline_epiglottis = load_articulator_array(fp_epiglottis, norm=False)
-    params_epiglottis = snail_parameters["epiglottis"]
+    fp_epiglottis = articulators_filepaths[EPIGLOTTIS]
+    midline_epiglottis = load_articulator_array(fp_epiglottis)
+    params_epiglottis = snail_parameters[EPIGLOTTIS]
     snail_epiglottis = reconstruct_snail_from_midline(midline_epiglottis, **params_epiglottis)
 
     # Load non-snail articulators
     articulators_arrays = {}
     for articulator, fp_articulator in articulators_filepaths.items():
         if articulator not in snail_parameters:
-            articulators_arrays[articulator] = load_articulator_array(fp_articulator, norm=False)
+            articulators_arrays[articulator] = load_articulator_array(fp_articulator)
 
-    articulators_arrays["soft-palate"] = snail_soft_palate
-    articulators_arrays["epiglottis"] = snail_epiglottis
+    articulators_arrays[SOFT_PALATE] = snail_soft_palate
+    articulators_arrays[EPIGLOTTIS] = snail_epiglottis
 
     return articulators_arrays
 
@@ -241,36 +240,36 @@ def generate_vocal_tract_tube(articulators_dict, eps=0.004, load=True):
 
     # Determine the closest point between the vocal folds and the epiglottis
     vocal_folds_end, epiglottis_start = closest_point_between_arrays(
-        articulators_arrays["vocal-folds"],
-        articulators_arrays["epiglottis"]
+        articulators_arrays[VOCAL_FOLDS],
+        articulators_arrays[EPIGLOTTIS]
     )
 
     # Determine the closest point between the epiglottis and the tongue
     tongue_start, epiglottis_end = closest_point_between_arrays(
-        articulators_arrays["tongue"],
-        articulators_arrays["epiglottis"]
+        articulators_arrays[TONGUE],
+        articulators_arrays[EPIGLOTTIS]
     )
 
     # Determine the closest point between the tongue and the lower incisor
     tongue_end, lower_incisor_start = closest_point_between_arrays(
-        articulators_arrays["tongue"],
-        articulators_arrays["lower-incisor"]
+        articulators_arrays[TONGUE],
+        articulators_arrays[LOWER_INCISOR]
     )
 
     # Determine the closest point between the lower incisor and the lower lip
     lower_incisor_end, lower_lip_start = closest_point_between_arrays(
-        articulators_arrays["lower-incisor"],
-        articulators_arrays["lower-lip"]
+        articulators_arrays[LOWER_INCISOR],
+        articulators_arrays[LOWER_LIP]
     )
 
-    lower_lip_end = find_lip_end(articulators_arrays["lower-lip"])
+    lower_lip_end = find_lip_end(articulators_arrays[LOWER_LIP])
 
     internal_wall = np.concatenate([
-        np.array([articulators_arrays["vocal-folds"][vocal_folds_end]]),
-        articulators_arrays["epiglottis"][epiglottis_start:epiglottis_end + 1],
-        articulators_arrays["tongue"][tongue_start:tongue_end + 1],
-        articulators_arrays["lower-incisor"][lower_incisor_start:lower_incisor_end + 1],
-        articulators_arrays["lower-lip"][lower_lip_start:lower_lip_end]
+        np.array([articulators_arrays[VOCAL_FOLDS][vocal_folds_end]]),
+        articulators_arrays[EPIGLOTTIS][epiglottis_start:epiglottis_end + 1],
+        articulators_arrays[TONGUE][tongue_start:tongue_end + 1],
+        articulators_arrays[LOWER_INCISOR][lower_incisor_start:lower_incisor_end + 1],
+        articulators_arrays[LOWER_LIP][lower_lip_start:lower_lip_end]
     ])
 
     internal_wall = upsample_curve(internal_wall, approx_n_samples=300)
@@ -293,8 +292,8 @@ def generate_vocal_tract_tube(articulators_dict, eps=0.004, load=True):
     # the lowest index in the soft palate array.
 
     dist_mtx = distance_matrix(
-        articulators_arrays["pharynx"],
-        articulators_arrays["soft-palate"]
+        articulators_arrays[PHARYNX],
+        articulators_arrays[SOFT_PALATE]
     )
 
     contact_points = np.where(dist_mtx < eps)
@@ -306,18 +305,18 @@ def generate_vocal_tract_tube(articulators_dict, eps=0.004, load=True):
         pharynx_end, soft_palate_end = sorted(contact_points, key=lambda p: p[0])[0]
     else:
         pharynx_end, soft_palate_end = closest_point_between_arrays(
-            articulators_arrays["pharynx"],
-            articulators_arrays["soft-palate"]
+            articulators_arrays[PHARYNX],
+            articulators_arrays[SOFT_PALATE]
         )
 
-    upper_lip_end = find_lip_end(articulators_arrays["upper-lip"])
+    upper_lip_end = find_lip_end(articulators_arrays[UPPER_LIP])
 
     external_wall = np.concatenate([
-        np.flip(articulators_arrays["arytenoid-muscle"], axis=0),
-        articulators_arrays["pharynx"][:pharynx_end + 1],
-        np.flip(articulators_arrays["soft-palate"][:soft_palate_end + 1], axis=0),
-        articulators_arrays["upper-incisor"],
-        articulators_arrays["upper-lip"][:upper_lip_end]
+        np.flip(articulators_arrays[ARYTENOID_MUSCLE], axis=0),
+        articulators_arrays[PHARYNX][:pharynx_end + 1],
+        np.flip(articulators_arrays[SOFT_PALATE][:soft_palate_end + 1], axis=0),
+        articulators_arrays[UPPER_INCISOR],
+        articulators_arrays[UPPER_LIP][:upper_lip_end]
     ])
 
     external_wall = upsample_curve(external_wall, approx_n_samples=300)
