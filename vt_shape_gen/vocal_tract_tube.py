@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from copy import deepcopy
+from shapely.geometry import LineString, Point
 from vt_tools import (
     ARYTENOID_MUSCLE,
     EPIGLOTTIS,
@@ -50,7 +51,33 @@ SNAIL_PARAMETERS = {
 }
 
 
-def closest_point_between_arrays(arr_1, arr_2):
+def intersection(arr1, arr2):
+    """
+    Finds the intersection points between two arrays.
+
+    Args:
+    arr_1 (np.ndarray): (N,) shaped array
+    arr_2 (np.ndarray): (M,) shaped array
+    """
+    line_string_1 = LineString(arr1)
+    line_string_2 = LineString(arr2)
+
+    is_contact = line_string_1.intersects(line_string_2)
+
+    if not is_contact:
+        return []
+
+    contact = line_string_1.intersection(line_string_2)
+    contact_list = (
+        [(contact.x, contact.y)]
+        if isinstance(contact, Point) else
+        [(p.x, p.y) for p in contact.geoms]
+    )
+
+    return contact_list
+
+
+def closest_point(arr_1, arr_2):
     """
     Calculates the closest point between two np.ndarray and return the indices for each array
 
@@ -116,7 +143,7 @@ def upsample_curve(curve, approx_n_samples):
     return np.array(new_curve)
 
 
-def load_articulators_arrays(articulators_filepaths, snail_parameters=None):
+def load_articulators_arrays(articulators_filepaths, snail_parameters=None, norm_value=None):
     """
     Load the articulators, processing the snail structures accordingly.
 
@@ -125,19 +152,20 @@ def load_articulators_arrays(articulators_filepaths, snail_parameters=None):
     and the filepath of the .npy file.
     snail_parameters (dict): Dictionary with the snail parameters for each snail articulator in
     articulators_filpaths.
+    norm_value (float): Value to normalize the articulators array.
     """
     if snail_parameters is None:
         snail_parameters = SNAIL_PARAMETERS
 
     # Load soft palate and reconstruct snail
     fp_soft_palate = articulators_filepaths[SOFT_PALATE]
-    midline_soft_palate = load_articulator_array(fp_soft_palate)
+    midline_soft_palate = load_articulator_array(fp_soft_palate, norm_value)
     params_soft_palate = snail_parameters[SOFT_PALATE]
     snail_soft_palate = reconstruct_snail_from_midline(midline_soft_palate, **params_soft_palate)
 
     # Load epiglottis and reconstruct snail
     fp_epiglottis = articulators_filepaths[EPIGLOTTIS]
-    midline_epiglottis = load_articulator_array(fp_epiglottis)
+    midline_epiglottis = load_articulator_array(fp_epiglottis, norm_value)
     params_epiglottis = snail_parameters[EPIGLOTTIS]
     snail_epiglottis = reconstruct_snail_from_midline(midline_epiglottis, **params_epiglottis)
 
@@ -145,7 +173,7 @@ def load_articulators_arrays(articulators_filepaths, snail_parameters=None):
     articulators_arrays = {}
     for articulator, fp_articulator in articulators_filepaths.items():
         if articulator not in snail_parameters:
-            articulators_arrays[articulator] = load_articulator_array(fp_articulator)
+            articulators_arrays[articulator] = load_articulator_array(fp_articulator, norm_value)
 
     articulators_arrays[SOFT_PALATE] = snail_soft_palate
     articulators_arrays[EPIGLOTTIS] = snail_epiglottis
@@ -221,112 +249,113 @@ def shapes_to_articulators_dict(shapes, articulators=None, regularize=False):
     return articulators_dicts
 
 
-def generate_vocal_tract_tube(articulators_dict, eps=0.004, load=True):
+def build_internal_wall(articulators_arrays):
+    """
+    Connect the articulators to produce the vocal tract internal wall.
+
+    Args:
+    articulators_dict (Dict): Dictionary containing the articulator name in the key and the filepath
+    of the .npy file.
+    """
+    order = [VOCAL_FOLDS, EPIGLOTTIS, TONGUE, LOWER_INCISOR, LOWER_LIP]
+
+    # The internal wall starts at the left-most point in the vocal folds
+    start_point = min(articulators_arrays[VOCAL_FOLDS], key=lambda t: t[0])
+    internal_wall = np.array([start_point])
+
+    for next_art in order[1:]:
+        arr1 = internal_wall
+        arr2 = articulators_arrays[next_art]
+
+        points = intersection(arr1, arr2) if len(arr1) > 1 and len(arr2) > 1 else []
+        if len(points) == 0:
+            contact = np.zeros(shape=(0, 2))
+            idx1, idx2 = closest_point(arr1, arr2)
+        else:
+            contact = sorted(points, key=lambda t: t[1])[0]
+            contact = np.array([contact])
+            idx1, _ = closest_point(internal_wall, contact)
+            idx2, _ = closest_point(arr2, contact)
+
+        arr1_cat = internal_wall[:idx1+1, :]
+
+        if next_art == LOWER_LIP:
+            lip_end = find_lip_end(arr2)
+            arr2 = arr2[:lip_end]
+
+        arr2_cat = arr2[idx2:]
+        internal_wall = np.concatenate([arr1_cat, contact, arr2_cat])
+
+    internal_wall = upsample_curve(internal_wall, approx_n_samples=300)
+    internal_wall = torch.from_numpy(internal_wall).T.unsqueeze(dim=0)
+    internal_wall = F.interpolate(internal_wall, size=100, mode="linear", align_corners=True)
+    internal_wall = internal_wall.squeeze(dim=0).T.numpy()
+
+    return internal_wall
+
+
+def build_external_wall(articulators_arrays):
+    """
+    Connect the articulators to produce the vocal tract external wall.
+
+    Args:
+    articulators_dict (Dict): Dictionary containing the articulator name in the key and the filepath
+    of the .npy file.
+    """
+    order = [ARYTENOID_MUSCLE, PHARYNX, SOFT_PALATE, UPPER_INCISOR, UPPER_LIP]
+
+    should_flip = lambda art: art in [ARYTENOID_MUSCLE, SOFT_PALATE]
+
+    # The internal wall starts at the left-most point in the vocal folds
+    external_wall = np.array(np.flip(articulators_arrays[ARYTENOID_MUSCLE], axis=0))
+
+    for next_art in order[1:]:
+        arr1 = external_wall
+        arr2 = articulators_arrays[next_art]
+
+        points = intersection(arr1, arr2) if len(arr1) > 1 and len(arr2) > 1 else []
+        if len(points) == 0:
+            contact = np.zeros(shape=(0, 2))
+            idx1, idx2 = closest_point(arr1, arr2)
+        else:
+            contact = sorted(points, key=lambda t: t[1])[-1]
+            contact = np.array([contact])
+            idx1, _ = closest_point(external_wall, contact)
+            idx2, _ = closest_point(arr2, contact)
+
+        arr1_cat = external_wall[:idx1+1, :]
+
+        if next_art == UPPER_LIP:
+            lip_end = find_lip_end(arr2)
+            arr2 = arr2[:lip_end]
+
+        arr2_cat = arr2[idx2:] if not should_flip(next_art) else np.flip(arr2[:idx2+1], axis=0)
+        external_wall = np.concatenate([arr1_cat, contact, arr2_cat])
+
+    external_wall = upsample_curve(external_wall, approx_n_samples=300)
+    external_wall = torch.from_numpy(external_wall).T.unsqueeze(dim=0)
+    external_wall = F.interpolate(external_wall, size=100, mode="linear", align_corners=True)
+    external_wall = external_wall.squeeze(dim=0).T.numpy()
+
+    return external_wall
+
+
+def generate_vocal_tract_tube(articulators_dict, load=True, norm_value=None):
     """
     Connect the articulators to produce a single shape for the entire vocal tract.
 
     Args:
     articulators_dict (Dict): Dictionary containing the articulator name in the key and the filepath
     of the .npy file.
-    eps (float): The maximum distance between two points that determine a contact.
     load (bool): If should load the articulators
+    norm_value (float): Value to normalize the articulators array. Only used if load == True.
     """
     if load:
-        articulators_arrays = load_articulators_arrays(articulators_dict)
+        articulators_arrays = load_articulators_arrays(articulators_dict, norm_value=norm_value)
     else:
         articulators_arrays = articulators_dict
 
-    # Internal vocal tract wall
-
-    # Determine the closest point between the vocal folds and the epiglottis
-    vocal_folds_end, epiglottis_start = closest_point_between_arrays(
-        articulators_arrays[VOCAL_FOLDS],
-        articulators_arrays[EPIGLOTTIS]
-    )
-
-    # Determine the closest point between the epiglottis and the tongue
-    tongue_start, epiglottis_end = closest_point_between_arrays(
-        articulators_arrays[TONGUE],
-        articulators_arrays[EPIGLOTTIS]
-    )
-
-    # Determine the closest point between the tongue and the lower incisor
-    tongue_end, lower_incisor_start = closest_point_between_arrays(
-        articulators_arrays[TONGUE],
-        articulators_arrays[LOWER_INCISOR]
-    )
-
-    # Determine the closest point between the lower incisor and the lower lip
-    lower_incisor_end, lower_lip_start = closest_point_between_arrays(
-        articulators_arrays[LOWER_INCISOR],
-        articulators_arrays[LOWER_LIP]
-    )
-
-    lower_lip_end = find_lip_end(articulators_arrays[LOWER_LIP])
-
-    internal_wall = np.concatenate([
-        np.array([articulators_arrays[VOCAL_FOLDS][vocal_folds_end]]),
-        articulators_arrays[EPIGLOTTIS][epiglottis_start:epiglottis_end + 1],
-        articulators_arrays[TONGUE][tongue_start:tongue_end + 1],
-        articulators_arrays[LOWER_INCISOR][lower_incisor_start:lower_incisor_end + 1],
-        articulators_arrays[LOWER_LIP][lower_lip_start:lower_lip_end]
-    ])
-
-    internal_wall = upsample_curve(internal_wall, approx_n_samples=300)
-    internal_wall_tensor = torch.from_numpy(internal_wall).T.unsqueeze(dim=0)
-    internal_wall_tensor = F.interpolate(
-        internal_wall_tensor,
-        size=100,
-        mode="linear",
-        align_corners=True
-    )
-    internal_wall = internal_wall_tensor.squeeze(dim=0).T.numpy()
-
-    # External vocal tract wall
-
-    # Determine the closest point between pharynx and soft palate
-
-    # The contact between the pharynx and the soft palate is a special case because it might have
-    # zero, one or two intersection points. If there are zero contact points, we select the same
-    # way we do for the remaining articulators. If there are one or more, we choose the one with
-    # the lowest index in the soft palate array.
-
-    dist_mtx = distance_matrix(
-        articulators_arrays[PHARYNX],
-        articulators_arrays[SOFT_PALATE]
-    )
-
-    contact_points = np.where(dist_mtx < eps)
-    contact_points = np.concatenate(
-        funcy.lmap(lambda arr: np.expand_dims(arr, axis=1), contact_points
-    ), axis=1)
-
-    if len(contact_points):
-        pharynx_end, soft_palate_end = sorted(contact_points, key=lambda p: p[0])[0]
-    else:
-        pharynx_end, soft_palate_end = closest_point_between_arrays(
-            articulators_arrays[PHARYNX],
-            articulators_arrays[SOFT_PALATE]
-        )
-
-    upper_lip_end = find_lip_end(articulators_arrays[UPPER_LIP])
-
-    external_wall = np.concatenate([
-        np.flip(articulators_arrays[ARYTENOID_MUSCLE], axis=0),
-        articulators_arrays[PHARYNX][:pharynx_end + 1],
-        np.flip(articulators_arrays[SOFT_PALATE][:soft_palate_end + 1], axis=0),
-        articulators_arrays[UPPER_INCISOR],
-        articulators_arrays[UPPER_LIP][:upper_lip_end]
-    ])
-
-    external_wall = upsample_curve(external_wall, approx_n_samples=300)
-    external_wall_tensor = torch.from_numpy(external_wall).T.unsqueeze(dim=0)
-    external_wall_tensor = F.interpolate(
-        external_wall_tensor,
-        size=100,
-        mode="linear",
-        align_corners=True
-    )
-    external_wall = external_wall_tensor.squeeze(dim=0).T.numpy()
+    internal_wall = build_internal_wall(articulators_arrays)
+    external_wall = build_external_wall(articulators_arrays)
 
     return internal_wall, external_wall
