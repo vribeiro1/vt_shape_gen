@@ -58,7 +58,7 @@ def intersection(arr1, arr2):
     Args:
     arr_1 (np.ndarray): (N,) shaped array
     arr_2 (np.ndarray): (M,) shaped array
-    """
+    """ 
     line_string_1 = LineString(arr1)
     line_string_2 = LineString(arr2)
 
