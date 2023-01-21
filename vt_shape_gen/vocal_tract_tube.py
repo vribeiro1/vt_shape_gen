@@ -187,12 +187,13 @@ def find_lip_end(lip_array):
     """
     half = len(lip_array) // 2
     lip_array_0 = lip_array[half:-1]
-    lip_array_1 = lip_array[1:half]
+    lip_array_1 = lip_array[half+1:]
 
     offsets = list(enumerate(zip(lip_array_0, lip_array_1)))
     decreasing_absissas = funcy.lfilter(lambda t: t[1][0][0] < t[1][1][0], offsets)
     if len(decreasing_absissas) > 0:
         idx, (_, _) = min(decreasing_absissas, key=lambda t: t[0])
+        idx += half
     else:
         idx = -1
 
