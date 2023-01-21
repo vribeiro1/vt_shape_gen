@@ -185,8 +185,9 @@ def find_lip_end(lip_array):
     """
     Finds the point where the absissas starts decreasing.
     """
-    lip_array_0 = lip_array[:-1]
-    lip_array_1 = lip_array[1:]
+    half = len(lip_array) // 2
+    lip_array_0 = lip_array[half:-1]
+    lip_array_1 = lip_array[1:half]
 
     offsets = list(enumerate(zip(lip_array_0, lip_array_1)))
     decreasing_absissas = funcy.lfilter(lambda t: t[1][0][0] < t[1][1][0], offsets)
