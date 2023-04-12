@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from copy import deepcopy
 from shapely.geometry import LineString, Point
 from vt_tools import (
-    ARYTENOID_MUSCLE,
+    ARYTENOID_CARTILAGE,
     EPIGLOTTIS,
     LOWER_INCISOR,
     LOWER_LIP,
     PHARYNX,
-    SOFT_PALATE,
+    SOFT_PALATE_MIDLINE,
     THYROID_CARTILAGE,
     TONGUE,
     UPPER_INCISOR,
@@ -36,7 +36,7 @@ def percent_to_mm(value_percent, resolution = 136, pixel_spacing=1.412):
 
 
 SNAIL_PARAMETERS = {
-    SOFT_PALATE: {
+    SOFT_PALATE_MIDLINE: {
         "width_int": mm_to_percent(1.5),
         "width_ext": mm_to_percent(3.5),
         "width_apex_int": mm_to_percent(2.5),
@@ -58,7 +58,7 @@ def intersection(arr1, arr2):
     Args:
     arr_1 (np.ndarray): (N,) shaped array
     arr_2 (np.ndarray): (M,) shaped array
-    """ 
+    """
     line_string_1 = LineString(arr1)
     line_string_2 = LineString(arr2)
 
@@ -158,9 +158,9 @@ def load_articulators_arrays(articulators_filepaths, snail_parameters=None, norm
         snail_parameters = SNAIL_PARAMETERS
 
     # Load soft palate and reconstruct snail
-    fp_soft_palate = articulators_filepaths[SOFT_PALATE]
+    fp_soft_palate = articulators_filepaths[SOFT_PALATE_MIDLINE]
     midline_soft_palate = load_articulator_array(fp_soft_palate, norm_value)
-    params_soft_palate = snail_parameters[SOFT_PALATE]
+    params_soft_palate = snail_parameters[SOFT_PALATE_MIDLINE]
     snail_soft_palate = reconstruct_snail_from_midline(midline_soft_palate, **params_soft_palate)
 
     # Load epiglottis and reconstruct snail
@@ -175,7 +175,7 @@ def load_articulators_arrays(articulators_filepaths, snail_parameters=None, norm
         if articulator not in snail_parameters:
             articulators_arrays[articulator] = load_articulator_array(fp_articulator, norm_value)
 
-    articulators_arrays[SOFT_PALATE] = snail_soft_palate
+    articulators_arrays[SOFT_PALATE_MIDLINE] = snail_soft_palate
     articulators_arrays[EPIGLOTTIS] = snail_epiglottis
 
     return articulators_arrays
@@ -214,8 +214,8 @@ def shapes_to_articulators_dict(shapes, articulators=None, regularize=False):
     """
     if articulators is None:
         articulators = sorted([
-            ARYTENOID_MUSCLE, EPIGLOTTIS, LOWER_INCISOR, LOWER_LIP,
-            PHARYNX, SOFT_PALATE, THYROID_CARTILAGE, TONGUE,
+            ARYTENOID_CARTILAGE, EPIGLOTTIS, LOWER_INCISOR, LOWER_LIP,
+            PHARYNX, SOFT_PALATE_MIDLINE, THYROID_CARTILAGE, TONGUE,
             UPPER_INCISOR, UPPER_LIP, VOCAL_FOLDS
         ])
 
@@ -234,12 +234,12 @@ def shapes_to_articulators_dict(shapes, articulators=None, regularize=False):
         ]
 
     for articulator_dict in articulators_dicts:
-        params_soft_palate = SNAIL_PARAMETERS[SOFT_PALATE]
+        params_soft_palate = SNAIL_PARAMETERS[SOFT_PALATE_MIDLINE]
         snail_soft_palate = reconstruct_snail_from_midline(
-            articulator_dict[SOFT_PALATE], **params_soft_palate
+            articulator_dict[SOFT_PALATE_MIDLINE], **params_soft_palate
         )
         snail_soft_palate = np.array(regularize_Bsplines(snail_soft_palate, degree=2)).T
-        articulator_dict[SOFT_PALATE] = snail_soft_palate
+        articulator_dict[SOFT_PALATE_MIDLINE] = snail_soft_palate
 
         params_epiglottis = SNAIL_PARAMETERS[EPIGLOTTIS]
         snail_epiglottis = reconstruct_snail_from_midline(
@@ -304,12 +304,12 @@ def build_external_wall(articulators_arrays):
     articulators_dict (Dict): Dictionary containing the articulator name in the key and the filepath
     of the .npy file.
     """
-    order = [ARYTENOID_MUSCLE, PHARYNX, SOFT_PALATE, UPPER_INCISOR, UPPER_LIP]
+    order = [ARYTENOID_CARTILAGE, PHARYNX, SOFT_PALATE_MIDLINE, UPPER_INCISOR, UPPER_LIP]
 
-    should_flip = lambda art: art in [ARYTENOID_MUSCLE, SOFT_PALATE]
+    should_flip = lambda art: art in [ARYTENOID_CARTILAGE, SOFT_PALATE_MIDLINE]
 
     # The internal wall starts at the left-most point in the vocal folds
-    external_wall = np.array(np.flip(articulators_arrays[ARYTENOID_MUSCLE], axis=0))
+    external_wall = np.array(np.flip(articulators_arrays[ARYTENOID_CARTILAGE], axis=0))
 
     for next_art in order[1:]:
         arr1 = external_wall
