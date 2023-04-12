@@ -259,11 +259,16 @@ def build_internal_wall(articulators_arrays):
     articulators_dict (Dict): Dictionary containing the articulator name in the key and the filepath
     of the .npy file.
     """
-    order = [VOCAL_FOLDS, EPIGLOTTIS, TONGUE, LOWER_INCISOR, LOWER_LIP]
+    order = [EPIGLOTTIS, TONGUE, LOWER_INCISOR, LOWER_LIP]
 
     # The internal wall starts at the left-most point in the vocal folds
     start_point = min(articulators_arrays[VOCAL_FOLDS], key=lambda t: t[0])
     internal_wall = np.array([start_point])
+
+    vocal_folds = articulators_arrays[VOCAL_FOLDS]
+    epiglottis = articulators_arrays[EPIGLOTTIS]
+    idx1, idx2 = closest_point(vocal_folds, epiglottis)
+    internal_wall = epiglottis[idx2:]
 
     for next_art in order[1:]:
         arr1 = internal_wall
@@ -309,7 +314,10 @@ def build_external_wall(articulators_arrays):
     should_flip = lambda art: art in [ARYTENOID_CARTILAGE, SOFT_PALATE_MIDLINE]
 
     # The internal wall starts at the left-most point in the vocal folds
-    external_wall = np.array(np.flip(articulators_arrays[ARYTENOID_CARTILAGE], axis=0))
+    vocal_folds = articulators_arrays[VOCAL_FOLDS]
+    arytenoid_cartilage = np.flip(articulators_arrays[ARYTENOID_CARTILAGE], axis=0)
+    idx1, idx2 = closest_point(vocal_folds, arytenoid_cartilage)
+    external_wall = arytenoid_cartilage[idx2:]
 
     for next_art in order[1:]:
         arr1 = external_wall
