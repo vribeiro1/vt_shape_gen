@@ -1,51 +1,74 @@
-<h1>Vocal Tract Shape Generator</h1>
+# `vt_shape_gen` - Vocal tract processing tools
 
-<p>
-    Automatic generation of the complete vocal tract shape from the sequence of phonemes to be articulated.
-</p>
+## What is it?
 
-<h2>How to contribute?</h2>
+`vt_shape_gen` is a Python library containing tools for the vocal tract synthesis from phonetic inputs,
+which is intended to advance speech articulation synthesis.
 
-<ol>
+## How to use?
 
-<li>Clone the repository</li>
-
-```
->> git clone git@gitlab.inria.fr:vsouzari/vt_shape_gen.git
-```
-
-<li> Create and activate your virtual environment</li>
+1. Clone `vt_tools` repo
 
 ```
->> cd vt_shape_gen
->> python3 -m venv .dev_env
->> source .dev_env/bin/activate
+>>> git clone git@clone-url/vt_tools.git
 ```
 
-<li>Clone vt_tools</li>
+2. Clone the repo
 
 ```
->> cd ..
->> git clone git@gitlab.inria.fr:vsouzari/vt_tools.git
->> cd vt_shape_gen
+>>> git clone git@clone-url/vt_shape_gen.git
 ```
 
-<li>Install vt_tools </li>
+3. Install the libs
 
 ```
->> pip3 install -e ../vt_tools
+>>> pip3 install -e /path/to/vt_tools
+>>> pip3 install -e /path/to/vt_shape_gen
 ```
 
-<li>Install the requirements </li>
+4. Import it in your code
 
 ```
->> pip3 install -r requirements.txt
+import vt_shape_gen
 ```
 
-<li>Run the tests</li>
+## How to contribute?
+
+1. Clone `vt_tools` repo
 
 ```
->> py.test test
+>>> git clone git@clone-url/vt_tools.git
 ```
 
-</ol>
+2. Clone the repo
+
+```
+>>> git clone git@clone-url/vt_shape_gen.git
+```
+
+3. Create a virtual environment
+
+```
+>>> cd vt_shape_gen
+>>> python3 -m venv .dev_env
+```
+
+3. Activate the virtual environment
+
+```
+>>> source .dev_env/bin/activate
+```
+
+4. Install the requirements
+
+```
+>>> pip3 install -r requirements.txt
+```
+
+5. Run the tests
+
+```
+>>> py.test test
+```
+
+6. Submit your pull request
