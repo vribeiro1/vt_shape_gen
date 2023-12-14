@@ -1,0 +1,25 @@
+build:
+  stage: build
+  image: python:3.11-alpine
+  script:
+    - pip install build
+    - python -m build
+  artifacts:
+    untracked: false
+    when: on_success
+    expire_in: "30 days"
+    paths:
+      - dist/
+
+publish:
+  stage: deploy
+  image: python:3.11-alpine
+  only:
+    refs:
+      - main
+  variables:
+    REPOSITORY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi"
+  script:
+    - pip install twine
+    - TWINE_PASSWORD=$CI_JOB_TOKEN TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url $REPOSITORY_URL dist/*
+
